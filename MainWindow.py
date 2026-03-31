@@ -2,7 +2,6 @@ import os
 import sys
 import uuid
 import numpy as np
-import torch
 import SimpleITK as sitk
 
 from PySide6.QtWidgets import *
@@ -13,7 +12,7 @@ from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 # Импортируем ваши зависимости (убедитесь, что файлы рядом)
-from SkullStripper import device, SkullStripper
+from SkullStripper import SkullStripper
 
 
 class MainWindow(QMainWindow):
@@ -74,7 +73,7 @@ class MainWindow(QMainWindow):
 
         # Статус-бар
         info_layout = QHBoxLayout()
-        self.lbl_info = QLabel(f">> SYSTEM READY | ACCELERATION: {device.type.upper()}")
+        self.lbl_info = QLabel(f">> SYSTEM READY")
         self.lbl_info.setObjectName("StatusLabel")
         self.progress_bar = QProgressBar()
         self.progress_bar.hide()

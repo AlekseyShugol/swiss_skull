@@ -1,10 +1,9 @@
-import torch
 from PySide6.QtCore import *
 import SimpleITK as sitk
 import numpy as np
 
 # Определяем устройство для вычислений: GPU (cuda), если доступно, иначе CPU
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 # Класс потока для обработки данных, чтобы интерфейс (GUI) не зависал во время расчетов
 class SkullStripper(QThread):
@@ -79,11 +78,11 @@ class SkullStripper(QThread):
             msk_arr = sitk.GetArrayFromImage(mask_res)
 
             # Перенос данных на видеокарту (или CPU) для ускорения дальнейших расчетов (например, сегментации)
-            img_t = torch.from_numpy(img_arr).to(device)
-            msk_t = torch.from_numpy(msk_arr.astype(np.float32)).to(device)
+            img_t = img_arr
+            msk_t = msk_arr
 
             # Возвращаем результат обратно в главный поток интерфейса
-            self.finished.emit(img_t.cpu().numpy(), msk_t.cpu().numpy())
+            self.finished.emit(img_t, msk_t)
 
         except Exception as e:
             self.progress.emit(f"Критическая ошибка: {str(e)}")
