@@ -1,18 +1,15 @@
 import os
-import sys
 import uuid
-import numpy as np
 import SimpleITK as sitk
 
 from PySide6.QtWidgets import *
 from PySide6.QtCore import *
-from PySide6.QtGui import QFont, QColor
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 # Импортируем ваши зависимости (убедитесь, что файлы рядом)
-from SkullStripper import SkullStripper
+from python.segmentation.SkullStripper import SkullStripper
 
 
 class MainWindow(QMainWindow):
@@ -141,8 +138,11 @@ class MainWindow(QMainWindow):
         self.btn_run.setEnabled(False)
         self.progress_bar.show()
         self.progress_bar.setRange(0, 0)
-
-        self.worker = SkullStripper(self.raw_patient, "atlasImage.mha", "atlasMask.mha")
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        print(current_dir)
+        atlas_image = os.path.join(current_dir, "atlasImage.mha")
+        atlas_mask = os.path.join(current_dir, "atlasMask.mha")
+        self.worker = SkullStripper(self.raw_patient, atlas_image, atlas_mask)
         self.worker.progress.connect(self.lbl_info.setText)
         self.worker.finished.connect(self.on_done)
         self.worker.start()
