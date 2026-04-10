@@ -10,8 +10,12 @@ from skimage import measure, morphology
 
 
 class BrainCleaner3D(QMainWindow):
-    def __init__(self, dicom_path=None):
+    def __init__(self, dicom_path=None, raw_img=None):
         super().__init__()
+
+        self.raw_img = raw_img  # Сохраняем переданное изображение
+        self.dicom_path = dicom_path  # Сохраняем путь (на будущее)
+
         self.setWindowTitle("Medical 3D: Brain Cleaner Pro")
         self.setMinimumSize(1400, 900)
 
@@ -20,6 +24,12 @@ class BrainCleaner3D(QMainWindow):
         self.last_mesh = None
 
         self.init_ui()
+
+        # Автоматическая загрузка данных, если передан raw_img
+        if self.raw_img is not None:
+            self.load_from_raw_image()
+        elif self.dicom_path is not None:
+            self.load_data(self.dicom_path)
 
     def init_ui(self):
         central_widget = QWidget()
@@ -100,7 +110,42 @@ class BrainCleaner3D(QMainWindow):
 
     def select_folder(self):
         path = QFileDialog.getExistingDirectory(self, "Select DICOM Directory")
-        if path: self.load_data(path)
+        if path:
+            self.load_data(path)
+
+    def load_from_raw_image(self):
+        """Загрузка данных из переданного raw_img (numpy array или SimpleITK image)"""
+        try:
+            # Проверяем тип переданных данных
+            if isinstance(self.raw_img, sitk.Image):
+                # Если это SimpleITK изображение
+                self.spacing = self.raw_img.GetSpacing()
+                self.full_volume = sitk.GetArrayFromImage(self.raw_img)
+                self.setWindowTitle(f"Medical 3D: Brain Cleaner Pro [Loaded from memory]")
+            elif isinstance(self.raw_img, np.ndarray):
+                # Если это numpy массив
+                self.full_volume = self.raw_img
+                self.spacing = (1.0, 1.0, 1.0)  # Стандартный spacing для numpy массива
+                self.setWindowTitle(
+                    f"Medical 3D: Brain Cleaner Pro [Loaded from array, shape={self.full_volume.shape}]")
+            else:
+                raise ValueError(f"Unsupported raw_img type: {type(self.raw_img)}")
+
+            # Настройка слайдера
+            self.slice_slider.setRange(0, self.full_volume.shape[0] - 1)
+            self.slice_slider.setValue(self.full_volume.shape[0] // 2)
+
+            # Обновляем отображение
+            self.update_plots()
+
+            # Делаем кнопку загрузки менее заметной, но оставляем активной
+            self.btn_load.setText("📁 Load Another DICOM")
+
+            QMessageBox.information(self, "Success",
+                                    f"Data loaded from memory!\nVolume shape: {self.full_volume.shape}")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load from raw_img: {e}")
 
     def load_data(self, path):
         try:
@@ -114,6 +159,7 @@ class BrainCleaner3D(QMainWindow):
             self.slice_slider.setRange(0, self.full_volume.shape[0] - 1)
             self.slice_slider.setValue(self.full_volume.shape[0] // 2)
             self.update_plots()
+            self.setWindowTitle(f"Medical 3D: Brain Cleaner Pro [{path}]")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Load failed: {e}")
 
@@ -201,6 +247,26 @@ class BrainCleaner3D(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
-    ex = BrainCleaner3D()
+
+    # Примеры использования:
+
+    # 1. Без параметров - нужно будет выбрать папку вручную
+    # ex = BrainCleaner3D()
+
+    # 2. С передачей numpy массива
+    # import nibabel as nib
+    # nifti_img = nib.load("brain.nii.gz")
+    # raw_data = nifti_img.get_fdata()
+    # ex = BrainCleaner3D(raw_img=raw_data)
+
+    # 3. С передачей SimpleITK изображения
+    # import SimpleITK as sitk
+    # sitk_img = sitk.ReadImage("brain.mha")
+    # ex = BrainCleaner3D(raw_img=sitk_img)
+
+    # 4. С передачей пути к DICOM
+    # ex = BrainCleaner3D(dicom_path="/path/to/dicom/folder")
+
+    ex = BrainCleaner3D()  # Стандартный запуск
     ex.show()
     sys.exit(app.exec())
