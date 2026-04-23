@@ -1,4 +1,5 @@
 import os
+import sys
 import uuid
 import SimpleITK as sitk
 
@@ -11,36 +12,73 @@ from matplotlib.figure import Figure
 # Импортируем ваши зависимости (убедитесь, что файлы рядом)
 from python.segmentation.SkullStripper import SkullStripper
 
+from python.convertation.convertation import BrainCleaner3D
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
-        # --- КРИТИЧЕСКИ ВАЖНО: Инициализация переменных до вызова интерфейса ---
+        self.converter_window = None
+        #Инициализация переменных
         self.img_data = None
         self.mask_data = None
         self.raw_patient = None
         self.worker = None
 
-        self.setWindowTitle("SwissSkullStripper GPU — Research Edition")
+        self.setWindowTitle("proj")
         self.setMinimumSize(1200, 900)
 
-        # Стилизация (Тёмная тема)
         self.setStyleSheet("""
-            QMainWindow { background-color: #121212; }
-            QWidget { background-color: #121212; color: #E0E0E0; font-family: 'Segoe UI', sans-serif; }
-            QFrame#ControlPanel { background-color: #1E1E1E; border-radius: 8px; border: 1px solid #333; }
+            QMainWindow {
+                background-color: #121212;
+            }
+            QWidget {
+                background-color: #121212;
+                color: #E0E0E0; 
+                font-family: 'Segoe UI', sans-serif;
+            }
+            QFrame#ControlPanel {
+                background-color: #1E1E1E; 
+                border-radius: 8px; 
+                border: 1px solid #333; 
+            }
             QPushButton { 
-                background-color: #2D2D2D; border: 1px solid #444; border-radius: 4px; 
+                background-color: #2D2D2D; 
+                border: 1px solid #444; 
+                border-radius: 4px; 
                 padding: 10px 20px; font-weight: bold; min-width: 150px; 
             }
-            QPushButton:hover { background-color: #3D3D3D; border: 1px solid #00ff41; }
-            QPushButton:pressed { background-color: #00ff41; color: #000; }
-            QPushButton:disabled { color: #555; background-color: #1A1A1A; border: 1px solid #222; }
-            QLabel#StatusLabel { color: #00ff41; font-family: 'Consolas', monospace; font-size: 11px; }
-            QSlider::handle:horizontal { background: #00ff41; width: 18px; margin: -5px 0; border-radius: 9px; }
-            QProgressBar { border: 1px solid #333; border-radius: 5px; text-align: center; height: 15px; }
-            QProgressBar::chunk { background-color: #00ff41; }
+            QPushButton:hover {
+                background-color: #3D3D3D;
+                border: 1px solid #00ff41; 
+            }
+            QPushButton:pressed {
+                background-color: #00ff41; 
+                color: #000;
+            }
+            QPushButton:disabled {
+                color: #555;
+                background-color: #1A1A1A;
+                border: 1px solid #222;
+            }
+            QLabel#StatusLabel { color: #00ff41;
+                font-family: 'Consolas', monospace;
+                font-size: 11px;
+            }
+            QSlider::handle:horizontal {
+                background: #00ff41;
+                width: 18px;
+                margin: -5px 0;
+                border-radius: 9px;
+            }
+            QProgressBar {
+                border: 1px solid #333;
+                border-radius: 5px; text-align: center;
+                height: 15px;
+            }
+            QProgressBar::chunk {
+                background-color: #00ff41; 
+            }
         """)
 
         self.init_ui()
@@ -55,15 +93,18 @@ class MainWindow(QMainWindow):
         self.controls.setObjectName("ControlPanel")
         ctrl_layout = QHBoxLayout(self.controls)
 
-        self.btn_load = QPushButton("📁 LOAD DICOM")
-        self.btn_run = QPushButton("⚡ RUN PROCESSING")
-        self.btn_save = QPushButton("💾 SAVE RESULT")
+        self.btn_load = QPushButton("LOAD DICOM")
+        self.btn_run = QPushButton("RUN SEGMENTATION")
+        self.btn_save = QPushButton("SAVE RESULT")
+        self.btn_convertation = QPushButton("RUN CONVERTATION")
 
         self.btn_run.setEnabled(False)
         self.btn_save.setEnabled(False)
+        self.btn_convertation.setEnabled(False)
 
         ctrl_layout.addWidget(self.btn_load)
         ctrl_layout.addWidget(self.btn_run)
+        ctrl_layout.addWidget(self.btn_convertation)
         ctrl_layout.addStretch()
         ctrl_layout.addWidget(self.btn_save)
         main_layout.addWidget(self.controls)
@@ -71,10 +112,13 @@ class MainWindow(QMainWindow):
         # Статус-бар
         info_layout = QHBoxLayout()
         self.lbl_info = QLabel(f">> SYSTEM READY")
+        self.setWindowTitle("SYSTEM READY")
         self.lbl_info.setObjectName("StatusLabel")
+
         self.progress_bar = QProgressBar()
         self.progress_bar.hide()
 
+        ctrl_layout.addStretch()
         info_layout.addWidget(self.lbl_info)
         info_layout.addWidget(self.progress_bar)
         main_layout.addLayout(info_layout)
@@ -107,6 +151,7 @@ class MainWindow(QMainWindow):
         self.btn_load.clicked.connect(self.load_dicom)
         self.btn_run.clicked.connect(self.run_process)
         self.btn_save.clicked.connect(self.save_dicom)
+        self.btn_convertation.clicked.connect(self.init_converter)
         self.slider.valueChanged.connect(self.update_slice_view)
 
     def update_slice_view(self):
@@ -142,6 +187,7 @@ class MainWindow(QMainWindow):
         print(current_dir)
         atlas_image = os.path.join(current_dir, "atlasImage.mha")
         atlas_mask = os.path.join(current_dir, "atlasMask.mha")
+
         self.worker = SkullStripper(self.raw_patient, atlas_image, atlas_mask)
         self.worker.progress.connect(self.lbl_info.setText)
         self.worker.finished.connect(self.on_done)
@@ -153,7 +199,9 @@ class MainWindow(QMainWindow):
         self.progress_bar.hide()
         self.btn_run.setEnabled(True)
         self.btn_save.setEnabled(True)
+        self.btn_convertation.setEnabled(True)
         self.lbl_info.setText(">> SEGMENTATION COMPLETE")
+        self.setWindowTitle("SEGMENTATION COMPLETE")
         self.draw()
 
     def draw(self):
@@ -163,7 +211,7 @@ class MainWindow(QMainWindow):
         # Предотвращение выхода за границы массива
         if idx >= self.img_data.shape[0]: return
 
-        self.ax1.clear();
+        self.ax1.clear()
         self.ax2.clear()
 
         vmax = self.img_data.max() * 0.6
@@ -171,13 +219,13 @@ class MainWindow(QMainWindow):
 
         self.ax1.imshow(self.img_data[idx], cmap='gray', vmax=vmax, vmin=vmin)
 
-        # Проверка наличия маски (теперь переменная точно существует)
+        # Проверка наличия маски
         if self.mask_data is not None:
             self.ax1.contour(self.mask_data[idx], colors='#00ffff', linewidths=0.5)
             res = self.img_data[idx] * self.mask_data[idx]
             self.ax2.imshow(res, cmap='gray', vmax=vmax, vmin=vmin)
 
-        self.ax1.axis('off');
+        self.ax1.axis('off')
         self.ax2.axis('off')
         self.canvas.draw()
 
@@ -249,3 +297,58 @@ class MainWindow(QMainWindow):
         except Exception as e:
             self.lbl_info.setText(f"Ошибка: {str(e)}")
 
+    def return_mask(self):
+        return self.mask_data
+
+    def init_converter(self):
+        """Запуск окна 3D конвертации с текущим изображением"""
+        if self.img_data is None:
+            QMessageBox.warning(self, "Warning", "No image data available. Please load DICOM first.")
+            return
+
+        try:
+            # Если окно уже существует, закрываем его
+            if hasattr(self, 'converter_window') and self.converter_window is not None:
+                try:
+                    self.converter_window.close()
+                    self.converter_window.deleteLater()  # Явно удаляем
+                except:
+                    pass
+                self.converter_window = None
+
+            # Применяем маску если есть
+            if self.mask_data is not None:
+                masked_image = self.img_data * self.mask_data
+                # ВАЖНО: передаем копию данных, чтобы избежать проблем с ссылками
+                image_to_pass = masked_image.copy()
+            else:
+                image_to_pass = self.img_data.copy()
+
+            # Создаем новое окно
+            self.converter_window = BrainCleaner3D(raw_img=image_to_pass)
+
+            # Устанавливаем флаг, чтобы окно удалялось при закрытии
+            self.converter_window.setAttribute(Qt.WA_DeleteOnClose, True)
+
+            # Подключаем сигнал закрытия для очистки ссылки
+            self.converter_window.destroyed.connect(self.on_converter_closed)
+
+            # Показываем окно
+            self.converter_window.show()
+
+            # Поднимаем окно на передний план
+            self.converter_window.raise_()
+            self.converter_window.activateWindow()
+
+            self.lbl_info.setText(">> 3D CONVERTER OPENED")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to open converter: {str(e)}")
+            self.lbl_info.setText(f">> ERROR: {str(e)}")
+            import traceback
+            traceback.print_exc()  # Выводим подробную ошибку в консоль
+
+    def on_converter_closed(self):
+        """Обработчик закрытия окна конвертера"""
+        self.converter_window = None
+        self.lbl_info.setText(">> 3D CONVERTER CLOSED")
