@@ -19,10 +19,14 @@ class SkullStripper(QThread):
     def run(self):
         try:
             self.progress.emit("Этап 1: Подготовка данных...")
+
             # Приведение ориентации пациента к стандарту LPS (Left-Posterior-Superior) для корректной анатомии
             fixed = sitk.DICOMOrient(self.patient_raw, 'LPS')
+
             # Установка изотропного шага пикселей (1мм x 1мм x 1мм) для стандартизации масштаба
-            spacing = [0.9, 0.9, 0.9]
+            spacing = [1, 1, 1]
+
+
             '''
             fixed.GetSize(): возвращает размеры изображения в пикселях по каждой оси
             fixed.GetSpacing(): возвращает текущий размер вокселя
@@ -30,9 +34,13 @@ class SkullStripper(QThread):
             '''
             # Вычисление нового размера изображения в пикселях на основе нового шага (spacing)
             new_size = [int(round(sz * sp / nsp)) for sz, sp, nsp in zip(fixed.GetSize(), fixed.GetSpacing(), spacing)]
+
+
             # Ресемплирование: пересчет сетки изображения под стандарт 1мм
             fixed = sitk.Resample(fixed, new_size, sitk.Transform(), sitk.sitkLinear,
                                   fixed.GetOrigin(), spacing, fixed.GetDirection(), 0.0)
+
+
             # Приведение типа данных к Float32 для математических операций регистрации
             fixed = sitk.Cast(fixed, sitk.sitkFloat32)
 
@@ -49,19 +57,28 @@ class SkullStripper(QThread):
             self.progress.emit("Этап 2: Аффинное совмещение (поиск углов)...")
             # Создание объекта метода регистрации (совмещения) двух изображений
             reg = sitk.ImageRegistrationMethod()
+
             # Настройка метрики: Взаимная информация (Mattes Mutual Information) — идеальна для разных модальностей
             reg.SetMetricAsMattesMutualInformation(numberOfHistogramBins=50)
+
             # Настройка оптимизатора: Градиентный спуск для поиска минимума ошибки
-            reg.SetOptimizerAsGradientDescent(learningRate=1.0, numberOfIterations=100, convergenceMinimumValue=1e-6,
+            reg.SetOptimizerAsGradientDescent(learningRate=1.0, numberOfIterations=1000, convergenceMinimumValue=1e-24-1,
                                               convergenceWindowSize=10)
+
             # Автоматическое масштабирование шагов оптимизатора на основе физических сдвигов
             reg.SetOptimizerScalesFromPhysicalShift()
 
             # Инициализация трансформации: совмещение центров масс или геометрических центров
             # (AffineTransform — вращение, сдвиг, масштаб)
-            tx = sitk.CenteredTransformInitializer(fixed, moving, sitk.AffineTransform(3),
-                                                   sitk.CenteredTransformInitializerFilter.GEOMETRY)
+            tx = sitk.CenteredTransformInitializer(
+                fixed,
+                moving,
+                sitk.AffineTransform(3),
+                sitk.CenteredTransformInitializerFilter.GEOMETRY
+            )
+
             reg.SetInitialTransform(tx) # Установка начальной позиции
+
             reg.SetInterpolator(sitk.sitkLinear) # Линейная интерполяция при трансформации
 
             # Запуск процесса регистрации: ищем матрицу, которая наложит атлас на пациента
@@ -77,7 +94,6 @@ class SkullStripper(QThread):
             img_arr = sitk.GetArrayFromImage(fixed)
             msk_arr = sitk.GetArrayFromImage(mask_res)
 
-            # Перенос данных на видеокарту (или CPU) для ускорения дальнейших расчетов (например, сегментации)
             img_t = img_arr
             msk_t = msk_arr
 
