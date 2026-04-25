@@ -62,8 +62,8 @@ class SkullStripper(QThread):
             reg.SetMetricAsMattesMutualInformation(numberOfHistogramBins=50)
 
             # Настройка оптимизатора: Градиентный спуск для поиска минимума ошибки
-            reg.SetOptimizerAsGradientDescent(learningRate=1.0, numberOfIterations=1000, convergenceMinimumValue=1e-24-1,
-                                              convergenceWindowSize=10)
+            reg.SetOptimizerAsGradientDescent(learningRate=1.0, numberOfIterations=1000, convergenceMinimumValue=1e-9,
+                                              convergenceWindowSize=20)
 
             # Автоматическое масштабирование шагов оптимизатора на основе физических сдвигов
             reg.SetOptimizerScalesFromPhysicalShift()

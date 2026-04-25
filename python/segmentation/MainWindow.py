@@ -12,7 +12,9 @@ from matplotlib.figure import Figure
 # Импортируем ваши зависимости (убедитесь, что файлы рядом)
 from python.segmentation.SkullStripper import SkullStripper
 
-from python.convertation.convertation import BrainCleaner3D
+#from python.convertation.convertation import BrainCleaner3D
+
+from python.convertation.MainWindow import BrainCleaner3D
 
 class MainWindow(QMainWindow):
     def __init__(self):
