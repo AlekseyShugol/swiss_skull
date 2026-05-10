@@ -1,25 +1,24 @@
 import os
 import sys
 import uuid
+
 import SimpleITK as sitk
-
-from PySide6.QtWidgets import *
-from PySide6.QtCore import *
-
+from convertation.convertation import BrainCleaner3D
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
+from PySide6.QtCore import *
+from PySide6.QtWidgets import *
 
 # Импортируем ваши зависимости (убедитесь, что файлы рядом)
-from python.segmentation.SkullStripper import SkullStripper
+from segmentation.SkullStripper import SkullStripper
 
-from python.convertation.convertation import BrainCleaner3D
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
         self.converter_window = None
-        #Инициализация переменных
+        # Инициализация переменных
         self.img_data = None
         self.mask_data = None
         self.raw_patient = None
@@ -34,26 +33,26 @@ class MainWindow(QMainWindow):
             }
             QWidget {
                 background-color: #121212;
-                color: #E0E0E0; 
+                color: #E0E0E0;
                 font-family: 'Segoe UI', sans-serif;
             }
             QFrame#ControlPanel {
-                background-color: #1E1E1E; 
-                border-radius: 8px; 
-                border: 1px solid #333; 
+                background-color: #1E1E1E;
+                border-radius: 8px;
+                border: 1px solid #333;
             }
-            QPushButton { 
-                background-color: #2D2D2D; 
-                border: 1px solid #444; 
-                border-radius: 4px; 
-                padding: 10px 20px; font-weight: bold; min-width: 150px; 
+            QPushButton {
+                background-color: #2D2D2D;
+                border: 1px solid #444;
+                border-radius: 4px;
+                padding: 10px 20px; font-weight: bold; min-width: 150px;
             }
             QPushButton:hover {
                 background-color: #3D3D3D;
-                border: 1px solid #00ff41; 
+                border: 1px solid #00ff41;
             }
             QPushButton:pressed {
-                background-color: #00ff41; 
+                background-color: #00ff41;
                 color: #000;
             }
             QPushButton:disabled {
@@ -77,7 +76,7 @@ class MainWindow(QMainWindow):
                 height: 15px;
             }
             QProgressBar::chunk {
-                background-color: #00ff41; 
+                background-color: #00ff41;
             }
         """)
 
@@ -124,13 +123,13 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(info_layout)
 
         # Визуализация
-        self.fig = Figure(facecolor='#121212', tight_layout=True)
+        self.fig = Figure(facecolor="#121212", tight_layout=True)
         self.canvas = FigureCanvas(self.fig)
         self.ax1 = self.fig.add_subplot(121)
         self.ax2 = self.fig.add_subplot(122)
         for ax in [self.ax1, self.ax2]:
-            ax.set_facecolor('#121212')
-            ax.axis('off')
+            ax.set_facecolor("#121212")
+            ax.axis("off")
 
         main_layout.addWidget(self.canvas, stretch=1)
 
@@ -167,7 +166,7 @@ class MainWindow(QMainWindow):
                 reader.SetFileNames(names)
                 self.raw_patient = reader.Execute()
 
-                preview = sitk.DICOMOrient(self.raw_patient, 'LPS')
+                preview = sitk.DICOMOrient(self.raw_patient, "LPS")
                 self.img_data = sitk.GetArrayFromImage(preview)
 
                 self.slider.setEnabled(True)
@@ -205,11 +204,13 @@ class MainWindow(QMainWindow):
         self.draw()
 
     def draw(self):
-        if self.img_data is None: return
+        if self.img_data is None:
+            return
         idx = self.slider.value()
 
         # Предотвращение выхода за границы массива
-        if idx >= self.img_data.shape[0]: return
+        if idx >= self.img_data.shape[0]:
+            return
 
         self.ax1.clear()
         self.ax2.clear()
@@ -217,20 +218,22 @@ class MainWindow(QMainWindow):
         vmax = self.img_data.max() * 0.6
         vmin = self.img_data.min()
 
-        self.ax1.imshow(self.img_data[idx], cmap='gray', vmax=vmax, vmin=vmin)
+        self.ax1.imshow(self.img_data[idx], cmap="gray", vmax=vmax, vmin=vmin)
 
         # Проверка наличия маски
         if self.mask_data is not None:
-            self.ax1.contour(self.mask_data[idx], colors='#00ffff', linewidths=0.5)
+            self.ax1.contour(self.mask_data[idx], colors="#00ffff", linewidths=0.5)
             res = self.img_data[idx] * self.mask_data[idx]
-            self.ax2.imshow(res, cmap='gray', vmax=vmax, vmin=vmin)
+            self.ax2.imshow(res, cmap="gray", vmax=vmax, vmin=vmin)
 
-        self.ax1.axis('off')
-        self.ax2.axis('off')
+        self.ax1.axis("off")
+        self.ax2.axis("off")
         self.canvas.draw()
 
     def save_dicom(self):
-        out_dir = QFileDialog.getExistingDirectory(self, "Выберите папку для сохранения серии")
+        out_dir = QFileDialog.getExistingDirectory(
+            self, "Выберите папку для сохранения серии"
+        )
         if not out_dir:
             return
 
@@ -271,22 +274,30 @@ class MainWindow(QMainWindow):
                 # --- КРИТИЧЕСКИЕ ТЕГИ ДЛЯ ГРУППИРОВКИ ---
                 image_slice.SetMetaData("0020|000d", study_uid)  # Study Instance UID
                 image_slice.SetMetaData("0020|000e", series_uid)  # Series Instance UID
-                image_slice.SetMetaData("0020|0052", frame_of_ref)  # Frame of Reference UID
+                image_slice.SetMetaData(
+                    "0020|0052", frame_of_ref
+                )  # Frame of Reference UID
 
                 # --- ТЕГИ ПОРЯДКА И ПОЗИЦИИ ---
                 image_slice.SetMetaData("0020|0013", str(i + 1))  # Instance Number
                 # Вычисляем Z позицию для каждого среза
                 current_z = origin[2] + i * spacing[2]
-                image_slice.SetMetaData("0020|0032", f"{origin[0]}\\{origin[1]}\\{current_z}")  # Image Position
+                image_slice.SetMetaData(
+                    "0020|0032", f"{origin[0]}\\{origin[1]}\\{current_z}"
+                )  # Image Position
                 image_slice.SetMetaData("0020|0037", iop)  # Image Orientation (Patient)
-                image_slice.SetMetaData("0028|0030", f"{spacing[0]}\\{spacing[1]}")  # Pixel Spacing
+                image_slice.SetMetaData(
+                    "0028|0030", f"{spacing[0]}\\{spacing[1]}"
+                )  # Pixel Spacing
                 image_slice.SetMetaData("0018|0050", f"{spacing[2]}")  # Slice Thickness
 
                 # --- ИНФОРМАЦИЯ О ПАЦИЕНТЕ (заглушки) ---
                 image_slice.SetMetaData("0010|0010", "Patient^SkullStripped")  # Name
                 image_slice.SetMetaData("0010|0020", "ID_001")  # Patient ID
                 image_slice.SetMetaData("0008|0060", "MR")  # Modality
-                image_slice.SetMetaData("0008|103e", "Skull Stripped Volume")  # Series Description
+                image_slice.SetMetaData(
+                    "0008|103e", "Skull Stripped Volume"
+                )  # Series Description
 
                 filename = os.path.join(out_dir, f"IM_{i + 1:04d}.dcm")
                 writer.SetFileName(filename)
@@ -303,12 +314,14 @@ class MainWindow(QMainWindow):
     def init_converter(self):
         """Запуск окна 3D конвертации с текущим изображением"""
         if self.img_data is None:
-            QMessageBox.warning(self, "Warning", "No image data available. Please load DICOM first.")
+            QMessageBox.warning(
+                self, "Warning", "No image data available. Please load DICOM first."
+            )
             return
 
         try:
             # Если окно уже существует, закрываем его
-            if hasattr(self, 'converter_window') and self.converter_window is not None:
+            if hasattr(self, "converter_window") and self.converter_window is not None:
                 try:
                     self.converter_window.close()
                     self.converter_window.deleteLater()  # Явно удаляем
@@ -346,6 +359,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"Failed to open converter: {str(e)}")
             self.lbl_info.setText(f">> ERROR: {str(e)}")
             import traceback
+
             traceback.print_exc()  # Выводим подробную ошибку в консоль
 
     def on_converter_closed(self):
