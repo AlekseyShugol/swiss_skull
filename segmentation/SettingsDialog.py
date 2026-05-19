@@ -1,6 +1,8 @@
 from PySide6.QtWidgets import *
 from PySide6.QtGui import QIntValidator, QDoubleValidator
 
+from segmentation.style import STYLE
+
 
 class SettingsDialog(QDialog):
     def __init__(self, parent=None, error_value=1e-9, iteration_value=100):
@@ -80,40 +82,7 @@ class SettingsDialog(QDialog):
         self.setLayout(layout)
 
         # Стилизация
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #2D2D2D;
-            }
-            QLabel {
-                color: #E0E0E0;
-            }
-            QLineEdit {
-                background-color: #3D3D3D;
-                border: 1px solid #555;
-                border-radius: 3px;
-                padding: 5px;
-                color: #00ff41;
-                font-family: monospace;
-            }
-            QLineEdit:focus {
-                border: 1px solid #00ff41;
-            }
-            QPushButton {
-                background-color: #3D3D3D;
-                border: 1px solid #555;
-                border-radius: 3px;
-                padding: 5px 15px;
-                color: #E0E0E0;
-            }
-            QPushButton:hover {
-                background-color: #4D4D4D;
-                border: 1px solid #00ff41;
-            }
-            QPushButton:pressed {
-                background-color: #00ff41;
-                color: #000000;
-            }
-        """)
+        self.setStyleSheet(STYLE)
 
     def validate_and_accept(self):
         """Проверка валидности введенных данных"""

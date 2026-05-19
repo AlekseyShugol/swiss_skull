@@ -5,13 +5,14 @@ import SimpleITK as sitk
 
 from PySide6.QtWidgets import *
 from PySide6.QtCore import *
-from PySide6.QtGui import QIcon, QAction, QDoubleValidator, QIntValidator
+from PySide6.QtGui import QAction
 
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 from segmentation.SettingsDialog import SettingsDialog
 from segmentation.SkullStripper import SkullStripper
+from segmentation.style import STYLE
 
 
 class MainWindow(QMainWindow):
@@ -25,99 +26,18 @@ class MainWindow(QMainWindow):
         self.worker = None
 
         # Настройки по умолчанию
+        current_dir = os.path.dirname(os.path.abspath(__file__))
         self.settings = {
             'error_value': 1e-30,
-            'iterations': 1000
+            'iterations': 1000,
+            'atlas_image_path': os.path.join(current_dir, "atlasImage.mha"),
+            'atlas_mask_path': os.path.join(current_dir, "atlasMask.mha")
         }
 
         self.setWindowTitle("proj")
         self.setMinimumSize(1200, 900)
 
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #121212;
-            }
-            QWidget {
-                background-color: #121212;
-                color: #E0E0E0; 
-                font-family: 'Segoe UI', sans-serif;
-            }
-            QLabel#StatusLabel { 
-                color: #00ff41;
-                font-family: 'Consolas', monospace;
-                font-size: 11px;
-            }
-            QSlider::handle:horizontal {
-                background: #00ff41;
-                width: 18px;
-                margin: -5px 0;
-                border-radius: 9px;
-            }
-            QProgressBar {
-                border: 1px solid #333;
-                border-radius: 5px; 
-                text-align: center;
-                height: 15px;
-            }
-            QProgressBar::chunk {
-                background-color: #00ff41; 
-            }
-            QToolBar {
-                background-color: #1A1A1A;
-                border-bottom: 2px solid #333;
-                spacing: 5px;
-                padding: 5px;
-            }
-            QToolBar QToolButton {
-                background-color: #2D2D2D;
-                border: 1px solid #444;
-                border-radius: 4px;
-                padding: 8px 15px;
-                color: #E0E0E0;
-                font-weight: bold;
-                margin: 2px;
-            }
-            QToolBar QToolButton:hover {
-                background-color: #3D3D3D;
-                border: 1px solid #00ff41;
-            }
-            QToolBar QToolButton:pressed {
-                background-color: #00ff41;
-                color: #000;
-            }
-            QToolBar QToolButton:disabled {
-                color: #555;
-                background-color: #1A1A1A;
-                border: 1px solid #222;
-            }
-            QMenuBar {
-                background-color: #1A1A1A;
-                color: #E0E0E0;
-                border-bottom: 1px solid #333;
-            }
-            QMenuBar::item:selected {
-                background-color: #333;
-            }
-            QMenu {
-                background-color: #1E1E1E;
-                color: #E0E0E0;
-                border: 1px solid #333;
-            }
-            QMenu::item:selected {
-                background-color: #333;
-            }
-            QLineEdit {
-                background-color: #2D2D2D;
-                border: 1px solid #444;
-                border-radius: 3px;
-                padding: 8px;
-                color: #E0E0E0;
-                font-size: 12px;
-            }
-            QLineEdit:focus {
-                border: 1px solid #00ff41;
-            }
-        """)
+        self.setStyleSheet(STYLE)
 
         self.init_ui()
         self.create_toolbar()
@@ -208,11 +128,47 @@ class MainWindow(QMainWindow):
         segmentation_settings_action.triggered.connect(self.open_settings)
         settings_menu.addAction(segmentation_settings_action)
 
+        # Новые пункты меню для выбора атласа и маски
+        settings_menu.addSeparator()
+
+        atlas_image_action = QAction("Select Atlas Image...", self)
+        atlas_image_action.triggered.connect(self.select_atlas_image)
+        settings_menu.addAction(atlas_image_action)
+
+        atlas_mask_action = QAction("Select Atlas Mask...", self)
+        atlas_mask_action.triggered.connect(self.select_atlas_mask)
+        settings_menu.addAction(atlas_mask_action)
+
         help_menu = menubar.addMenu("Help")
 
         about_action = QAction("About", self)
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
+
+    def select_atlas_image(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Atlas Image",
+            os.path.dirname(self.settings['atlas_image_path']),
+            "MHA files (*.mha);;All files (*.*)"
+        )
+        if file_path:
+            self.settings['atlas_image_path'] = file_path
+            self.lbl_info.setText(f">> ATLAS IMAGE: {os.path.basename(file_path)}")
+
+    def select_atlas_mask(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Select Atlas Mask",
+            os.path.dirname(self.settings['atlas_mask_path']),
+            "MHA files (*.mha);;All files (*.*)"
+        )
+        if file_path:
+            self.settings['atlas_mask_path'] = file_path
+            print(  self.settings['atlas_mask_path'])
+            self.lbl_info.setText(f">> ATLAS MASK: {os.path.basename(file_path)}")
+        else:
+            print("No atlas mask selected")
 
     def show_about(self):
         QMessageBox.about(self, "About proj",
@@ -224,7 +180,9 @@ class MainWindow(QMainWindow):
                           "• Result export to DICOM\n\n"
                           f"Current Settings:\n"
                           f"• Iterations: {self.settings['iterations']}\n"
-                          f"• Convergence: {self.settings['error_value']:.0e}")
+                          f"• Convergence: {self.settings['error_value']:.0e}\n"
+                          f"• Atlas Image: {os.path.basename(self.settings['atlas_image_path'])}\n"
+                          f"• Atlas Mask: {os.path.basename(self.settings['atlas_mask_path'])}")
 
     def open_settings(self):
         dialog = SettingsDialog(
@@ -234,7 +192,7 @@ class MainWindow(QMainWindow):
         )
 
         if dialog.exec() == QDialog.Accepted:
-            self.settings = dialog.get_settings()
+            self.settings.update(dialog.get_settings())
             self.lbl_info.setText(
                 f">> SETTINGS UPDATED: {self.settings['iterations']} iterations, error={self.settings['error_value']:.0e}")
 
@@ -350,18 +308,28 @@ class MainWindow(QMainWindow):
             self.lbl_info.setText(">> CLEARED - SYSTEM READY")
 
     def run_process(self):
+        # Проверяем существование файлов атласа
+        if not os.path.exists(self.settings['atlas_image_path']):
+            QMessageBox.warning(self, "Warning",
+                                f"Atlas image not found: {self.settings['atlas_image_path']}\n"
+                                "Please select valid atlas image in Settings menu.")
+            return
+
+        if not os.path.exists(self.settings['atlas_mask_path']):
+            QMessageBox.warning(self, "Warning",
+                                f"Atlas mask not found: {self.settings['atlas_mask_path']}\n"
+                                "Please select valid atlas mask in Settings menu.")
+            return
+
         self.run_action.setEnabled(False)
         self.segment_menu_action.setEnabled(False)
         self.progress_bar.show()
         self.progress_bar.setRange(0, 0)
-        current_dir = os.path.dirname(os.path.abspath(__file__))
-        atlas_image = os.path.join(current_dir, "atlasImage.mha")
-        atlas_mask = os.path.join(current_dir, "atlasMask.mha")
 
         self.worker = SkullStripper(
             self.raw_patient,
-            atlas_image,
-            atlas_mask,
+            self.settings['atlas_image_path'],
+            self.settings['atlas_mask_path'],
             error_value=self.settings['error_value'],
             iteration_value=self.settings['iterations']
         )
@@ -513,10 +481,3 @@ class MainWindow(QMainWindow):
     def on_converter_closed(self):
         self.converter_window = None
         self.lbl_info.setText(">> 3D CONVERTER CLOSED")
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec())

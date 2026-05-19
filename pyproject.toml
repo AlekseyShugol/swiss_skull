@@ -54,5 +54,19 @@ dependencies = [
     "vtk==9.6.0",
 ]
 
+[tool.pyinstaller]
+onefile = true
+windowed = false  # пока false для консоли, потом true
+console = true
+name = "SwissSkull"
+spec_file = "build.spec"
+
 [project.scripts]
 swiss-skull = "main:main"
+build-exe = "pyinstaller build.spec --onefile --console"
+build-exe-noconsole = "pyinstaller build.spec --onefile --windowed"
+
+[dependency-groups]
+dev = [
+    "pyinstaller>=6.20.0",
+]
