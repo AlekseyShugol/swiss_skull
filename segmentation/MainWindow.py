@@ -28,7 +28,7 @@ class MainWindow(QMainWindow):
         # Настройки по умолчанию
         current_dir = os.path.dirname(os.path.abspath(__file__))
         self.settings = {
-            'error_value': 1e-30,
+            'error_value': "1e-30",
             'iterations': 1000,
             'atlas_image_path': os.path.join(current_dir, "atlasImage.mha"),
             'atlas_mask_path': os.path.join(current_dir, "atlasMask.mha")
@@ -185,11 +185,21 @@ class MainWindow(QMainWindow):
                           f"• Atlas Mask: {os.path.basename(self.settings['atlas_mask_path'])}")
 
     def open_settings(self):
+        if self.settings['error_value'] == 0.0001:
+            print("lkdjmflsmlsmv")
+            self.settings['error_value'] = "1.e-04"
+        elif self.settings['error_value'] == 0.001:
+            print("lkdjmflsmlsmv222222")
+            self.settings['error_value'] = "1.e-03"
+        else:
+            print(  self.settings['error_value'])
+
         dialog = SettingsDialog(
             self,
             error_value=self.settings['error_value'],
             iteration_value=self.settings['iterations']
         )
+        print(self.settings['error_value'])
 
         if dialog.exec() == QDialog.Accepted:
             self.settings.update(dialog.get_settings())
@@ -330,7 +340,7 @@ class MainWindow(QMainWindow):
             self.raw_patient,
             self.settings['atlas_image_path'],
             self.settings['atlas_mask_path'],
-            error_value=self.settings['error_value'],
+            error_value=float(self.settings['error_value']),
             iteration_value=self.settings['iterations']
         )
         self.worker.progress.connect(self.lbl_info.setText)
@@ -338,12 +348,12 @@ class MainWindow(QMainWindow):
         self.worker.finished.connect(self.on_done)
 
         self.setWindowTitle(
-            f"Processing - Settings: {self.settings['iterations']} iter, err={self.settings['error_value']:.0e}")
+            f"Processing - Settings: {self.settings['iterations']} iter, err={float(self.settings['error_value']):.0e}")
         self.worker.start()
 
     def update_iteration_title(self, iteration):
         total = self.settings['iterations']
-        error_val = self.settings['error_value']
+        error_val = float(self.settings['error_value'])
         self.setWindowTitle(f"Processing - Iteration {iteration}/{total} (error={error_val:.1e})")
 
     def on_done(self, img, mask):

@@ -8,7 +8,7 @@ from scipy import ndimage
 
 # ==================== ЛОГИКА (ЧИСТАЯ, БЕЗ UI) ====================
 class BrainCleanerLogic:
-    """Чистая логика обработки медицинских 3D-данных."""
+    """логика обработки медицинских 3D-данных."""
 
     def __init__(self):
         self.full_volume = None
