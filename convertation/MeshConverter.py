@@ -6,8 +6,10 @@ from scipy import ndimage
 import json
 import os
 
+from convertation.mesh_data.model_metadata import DATA
 
-class BrainCleanerLogic:
+
+class MeshConverter:
     """логика обработки медицинских 3D-данных."""
 
     def __init__(self):
@@ -24,12 +26,7 @@ class BrainCleanerLogic:
         }
 
         # Метаданные для JSON
-        self.model_metadata = {
-            'brain': {'position': [0, 0, 0], 'scale': [1, 1, 1], 'status': 'ready'},
-            'tumor': {'position': [0, 0, 0], 'scale': [1, 1, 1], 'status': 'ready'},
-            'skull': {'position': [0, 0, 0], 'scale': [1, 1, 1], 'status': 'in_development'},
-            'arteria': {'position': [0, 0, 0], 'scale': [1, 1, 1], 'status': 'in_development'}
-        }
+        self.model_metadata = DATA
 
     def load_from_raw_image(self, raw_img):
         """Загрузка данных из переданного raw_img (numpy array или SimpleITK image)."""
@@ -114,9 +111,14 @@ class BrainCleanerLogic:
             # Marching Cubes
             spacing_x, spacing_y, spacing_z = self.spacing
 
-            need_padding = (np.any(processed_mask[0, :, :]) or np.any(processed_mask[-1, :, :]) or
-                            np.any(processed_mask[:, 0, :]) or np.any(processed_mask[:, -1, :]) or
-                            np.any(processed_mask[:, :, 0]) or np.any(processed_mask[:, :, -1]))
+            need_padding = (
+                    np.any(processed_mask[0, :, :])     or
+                    np.any(processed_mask[-1, :, :])    or
+                    np.any(processed_mask[:, 0, :])     or
+                    np.any(processed_mask[:, -1, :])    or
+                    np.any(processed_mask[:, :, 0])     or 
+                    np.any(processed_mask[:, :, -1])
+            )
 
             if need_padding:
                 mask_padded = np.pad(smooth_mask, 2, mode='constant', constant_values=0)
@@ -153,9 +155,7 @@ class BrainCleanerLogic:
             print(f"Error generating mesh: {e}")
             return None
 
-    def build_single_model(self, model_type, roi_pos, roi_size, threshold_value,
-                           min_island_size, keep_largest, sigma_value,
-                           smooth_iterations, center_model):
+    def build_single_model(self, model_type, roi_pos, roi_size, threshold_value, min_island_size, keep_largest, sigma_value, smooth_iterations, center_model):
         """
         Строит ОДНУ модель указанного типа из выделенной ROI.
         Использует ТОЛЬКО порог пользователя.
@@ -247,9 +247,7 @@ class BrainCleanerLogic:
 
         return mesh
 
-    def build_selected_models(self, selected_types, roi_pos, roi_size, threshold_value,
-                              min_island_size, keep_largest, sigma_value,
-                              smooth_iterations, center_model):
+    def build_selected_models(self, selected_types, roi_pos, roi_size, threshold_value, min_island_size, keep_largest, sigma_value, smooth_iterations, center_model):
         """
         Строит только выбранные пользователем модели.
         selected_types: список ['brain', 'tumor', 'skull', 'arteria']

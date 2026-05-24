@@ -1,5 +1,4 @@
 import os
-import sys
 import uuid
 import SimpleITK as sitk
 
@@ -10,7 +9,7 @@ from PySide6.QtGui import QAction
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.figure import Figure
 
-from segmentation.SettingsDialog import SettingsDialog
+from segmentation.ui.SettingsDialog import SettingsDialog
 from segmentation.SkullStripper import SkullStripper
 from segmentation.style import STYLE
 
@@ -471,9 +470,9 @@ class MainWindow(QMainWindow):
                 image_to_pass = self.img_data.copy()
 
             # Импортируем здесь, чтобы избежать циклических импортов
-            from convertation.MainWindow import BrainCleaner3D
+            from convertation.MainWindow import MainWindow
 
-            self.converter_window = BrainCleaner3D(raw_img=image_to_pass)
+            self.converter_window = MainWindow(raw_img=image_to_pass)
             self.converter_window.setAttribute(Qt.WA_DeleteOnClose, True)
             self.converter_window.destroyed.connect(self.on_converter_closed)
             self.converter_window.show()
