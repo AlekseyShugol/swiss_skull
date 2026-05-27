@@ -1,0 +1,154 @@
+from PySide6.QtWidgets import *
+from PySide6.QtGui import QIntValidator, QDoubleValidator, QRegularExpressionValidator
+from PySide6.QtCore import QRegularExpression
+
+from segmentation.style import STYLE
+
+
+class SettingsDialog(QDialog):
+    def __init__(self, parent=None, error_value="1e-30", iteration_value=1000):
+        super().__init__(parent)
+        self.setWindowTitle("Настройки сегментации")
+        self.setModal(True)
+        self.setMinimumWidth(400)
+
+        layout = QVBoxLayout()
+
+        # Настройка итераций
+        iter_layout = QVBoxLayout()
+        iter_label = QLabel("Количество итераций:")
+        iter_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
+
+        self.iter_input = QLineEdit()
+        self.iter_input.setText(str(iteration_value))
+
+        # Валидатор для итераций: положительные целые числа от 1 до max_int-1
+        iter_validator = QIntValidator(1, 2147483646)
+        self.iter_input.setValidator(iter_validator)
+
+        iter_info = QLabel("Диапазон: от 1 до 2 147 483 646")
+        iter_info.setStyleSheet("color: #808080; font-size: 10px;")
+
+        iter_layout.addWidget(iter_label)
+        iter_layout.addWidget(self.iter_input)
+        iter_layout.addWidget(iter_info)
+        layout.addLayout(iter_layout)
+
+        # Разделитель
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(line)
+
+        # Настройка ошибки
+        error_layout = QVBoxLayout()
+        error_label = QLabel("Цена ошибки:")
+        error_label.setStyleSheet("font-weight: bold; margin-top: 10px;")
+
+        self.error_input = QLineEdit()
+
+        # Форматирование для научной нотации
+        try:
+            float_val = float(error_value)
+            if float_val < 0.001:
+                self.error_input.setText(f"{float_val:.0e}")
+            else:
+                self.error_input.setText(str(float_val))
+        except:
+            self.error_input.setText("1e-30")
+
+        # Используем регулярное выражение для валидации научной нотации
+        # Паттерн: число в научной нотации (например: 1e-3, 1.5e-10, 0.1)
+        scientific_pattern = QRegularExpression(r'^[+-]?\d*\.?\d+(?:[eE][+-]?\d+)?$')
+        error_validator = QRegularExpressionValidator(scientific_pattern, self.error_input)
+        self.error_input.setValidator(error_validator)
+
+        error_info = QLabel("Формат: число или научная нотация (например: 0.001, 1e-3, 1e-30)")
+        error_info.setStyleSheet("color: #808080; font-size: 10px;")
+
+        error_layout.addWidget(error_label)
+        error_layout.addWidget(self.error_input)
+        error_layout.addWidget(error_info)
+        layout.addLayout(error_layout)
+
+        # Кнопки
+        button_layout = QHBoxLayout()
+        self.ok_btn = QPushButton("OK")
+        self.cancel_btn = QPushButton("Отмена")
+
+        self.ok_btn.clicked.connect(self.validate_and_accept)
+        self.cancel_btn.clicked.connect(self.reject)
+
+        button_layout.addWidget(self.ok_btn)
+        button_layout.addWidget(self.cancel_btn)
+        layout.addLayout(button_layout)
+
+        self.setLayout(layout)
+
+        # Стилизация
+        self.setStyleSheet(STYLE)
+
+    def validate_and_accept(self):
+        """Проверка валидности введенных данных"""
+        # Проверка итераций
+        iter_text = self.iter_input.text()
+        if not iter_text:
+            QMessageBox.warning(self, "Ошибка", "Введите количество итераций")
+            return
+
+        try:
+            iterations = int(iter_text)
+            if iterations < 1:
+                QMessageBox.warning(self, "Ошибка", "Количество итераций должно быть не менее 1")
+                return
+            if iterations > 2147483646:
+                QMessageBox.warning(self, "Ошибка", "Количество итераций слишком велико")
+                return
+        except ValueError:
+            QMessageBox.warning(self, "Ошибка", "Некорректное значение итераций")
+            return
+
+        # Проверка ошибки
+        error_text = self.error_input.text()
+        if not error_text:
+            QMessageBox.warning(self, "Ошибка", "Введите значение ошибки")
+            return
+
+        try:
+            # Поддержка научной нотации
+            error_value = float(error_text)
+
+            # Проверка границ
+            if error_value <= 0:
+                QMessageBox.warning(self, "Ошибка", "Цена ошибки должна быть положительным числом")
+                return
+            if error_value > 0.1:
+                QMessageBox.warning(self, "Ошибка", "Цена ошибки должна быть <= 0.1")
+                return
+            if error_value < 1e-3000:
+                QMessageBox.warning(self, "Ошибка", "Цена ошибки слишком мала (минимальное значение 1e-3000)")
+                return
+
+        except ValueError:
+            QMessageBox.warning(self, "Ошибка",
+                                f"Некорректное значение ошибки: '{error_text}'\nИспользуйте формат: 0.001, 1e-3, 1e-30 и т.д.")
+            return
+
+        self.accept()
+
+    def get_settings(self):
+        """Возвращает настройки из диалога"""
+        try:
+            iterations = int(self.iter_input.text())
+        except:
+            iterations = 1000
+
+        try:
+            error_value = float(self.error_input.text())
+        except:
+            error_value = 1e-30
+
+        return {
+            'error_value': error_value,
+            'iterations': iterations
+        }
