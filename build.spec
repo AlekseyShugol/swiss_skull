@@ -177,7 +177,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='SwissSkullUtil_v3.0.1',
+    name='SwissSkullUtil_v3.0.3',
     debug=False,
     bootloader_ignore_signals=False,
     strip=True,
