@@ -3,9 +3,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QWidget, QHBoxLayout, QFrame, QVBoxLayout, QPushButton, QCheckBox, QSlider, QSplitter
 from pyvistaqt import QtInteractor
 
-from convertation.MeshConverter import MeshConverter
 from convertation.ui.slider import LabeledSlider
-from convertation.logger.logger import log
+from logger.logger import log
 
 import pyqtgraph as pg
 

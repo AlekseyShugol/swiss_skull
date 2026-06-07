@@ -4,15 +4,16 @@ import sys
 import numpy as np
 import pyvista as pv
 
-from PySide6.QtWidgets import *
-from PySide6.QtGui import *
+from PySide6.QtWidgets import QMainWindow, QGroupBox, QFileDialog, QDialog, QVBoxLayout, QTextEdit, QPushButton, \
+    QMessageBox
+from PySide6.QtGui import QShortcut, QKeySequence
 
 from convertation.MeshConverter import MeshConverter
 from convertation.ui.dialogs import show_info, show_error, show_warning
 from convertation.ui.main_window_panel import MainWindowPanel
 from convertation.ui.styles import APP_STYLE
 from convertation.ui.toolbar import MainToolBar
-from convertation.logger.logger import log
+from logger.logger import log
 
 
 class MainWindow(QMainWindow):

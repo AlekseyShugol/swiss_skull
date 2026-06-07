@@ -29,3 +29,6 @@ def show_error(parent, title, message):
     msg.setText(message)
     msg.setStyleSheet(DIALOGUE_STYLE)
     msg.exec()
+
+
+

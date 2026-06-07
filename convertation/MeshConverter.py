@@ -6,7 +6,12 @@ from scipy import ndimage
 import json
 import os
 
+from PySide6.QtWidgets import QMessageBox
+
+from convertation.ui.dialogs import show_error
 from convertation.mesh_data.model_metadata import DATA
+from logger.logger import log
+
 
 
 class MeshConverter:
@@ -29,65 +34,96 @@ class MeshConverter:
         self.model_metadata = DATA
 
     def load_from_raw_image(self, raw_img):
+        log.separator()
+        log.info('function "load_from_raw_image" called')
         """Загрузка данных из переданного raw_img (numpy array или SimpleITK image)."""
-        if isinstance(raw_img, sitk.Image):
-            self.spacing = raw_img.GetSpacing()
-            self.full_volume = sitk.GetArrayFromImage(raw_img)
-        elif isinstance(raw_img, np.ndarray):
-            self.full_volume = raw_img
-            self.spacing = (1.0, 1.0, 1.0)
-        else:
-            raise ValueError(f"Unsupported raw_img type: {type(raw_img)}")
+        try:
+            if isinstance(raw_img, sitk.Image):
+                log.info(f'isinstance(raw_img, sitk.Image) is {isinstance(raw_img, sitk.Image)}')
+                self.spacing = raw_img.GetSpacing()
+                self.full_volume = sitk.GetArrayFromImage(raw_img)
+            elif isinstance(raw_img, np.ndarray):
+                self.full_volume = raw_img
+                self.spacing = (1.0, 1.0, 1.0)
+            else:
+                raise ValueError(f"Unsupported raw_img type: {type(raw_img)}")
+        except Exception as e:
+            show_error(None,"ERROR",str(e))
+            log.error(f"Failed to load raw_img: {raw_img}")
+            raise e
         return self.full_volume.shape
 
     def load_from_dicom(self, path):
         """Загрузка DICOM серии."""
-        reader = sitk.ImageSeriesReader()
-        names = reader.GetGDCMSeriesFileNames(path)
-        reader.SetFileNames(names)
-        image = reader.Execute()
-        self.spacing = image.GetSpacing()
-        self.full_volume = sitk.GetArrayFromImage(image)
-        return self.full_volume.shape
+        try:
+            log.separator()
+            log.info(f'function "load_from_dicom" called')
+            log.info(f"Loading {path}")
+            reader = sitk.ImageSeriesReader()
+            names = reader.GetGDCMSeriesFileNames(path)
+            reader.SetFileNames(names)
+            image = reader.Execute()
+            self.spacing = image.GetSpacing()
+            self.full_volume = sitk.GetArrayFromImage(image)
+            return self.full_volume.shape
+        except Exception as e:
+            log.error(f"Failed to load {path}: {e}")
+            show_error(None, "ERROR", str(e))
+            raise e
 
     def get_slice(self, z, threshold=None):
         """Возвращает срез и маску для отображения."""
-        if self.full_volume is None:
+        try:
+            if self.full_volume is None:
+                return None, None
+
+            img = np.rot90(self.full_volume[z], -1)
+
+            if threshold is not None:
+                mask = (img > threshold).astype(np.uint8) * 255
+            else:
+                mask = None
+            return img, mask
+        except Exception as e:
+            log.error(f"Failed to get slice: {e}")
+            show_error(None, "ERROR", str(e))
+            raise e
             return None, None
 
-        img = np.rot90(self.full_volume[z], -1)
-
-        if threshold is not None:
-            mask = (img > threshold).astype(np.uint8) * 255
-        else:
-            mask = None
-
-        return img, mask
-
     def fix_orientation_and_center(self, mesh, center_model=True):
-        """Исправляет ориентацию и центрирует модель."""
+        try:
+            log.separator()
+            log.info(f'function "fix_orientation_and_center" called')
+            log.info(f"Fixing orientation and center")
 
-        original_bounds = mesh.bounds
-        print(f"Original bounds: {original_bounds}")
+            """Исправляет ориентацию и центрирует модель."""
+            original_bounds = mesh.bounds
+            print(f"Original bounds: {original_bounds}")
+            log.info(f"Original bounds: {original_bounds}")
 
-        if center_model:
-            center = mesh.center
-            mesh.points = mesh.points - center
+            if center_model:
+                center = mesh.center
+                mesh.points = mesh.points - center
 
-        points = mesh.points.copy()
-        mesh.points[:, 0] = points[:, 2]  # X <- Z (left-right)
-        mesh.points[:, 1] = points[:, 0]  # Y <- X (superior-inferior, вверх)
-        mesh.points[:, 2] = points[:, 1]  # Z <- Y (anterior-posterior, вперёд)
+            points = mesh.points.copy()
+            mesh.points[:, 0] = points[:, 2]  # X <- Z (left-right)
+            mesh.points[:, 1] = points[:, 0]  # Y <- X (superior-inferior, вверх)
+            mesh.points[:, 2] = points[:, 1]  # Z <- Y (anterior-posterior, вперёд)
 
-        min_y = mesh.points[:, 1].min()
-        if min_y < 0:
-            mesh.points[:, 1] = mesh.points[:, 1] - min_y
+            min_y = mesh.points[:, 1].min()
+            if min_y < 0:
+                mesh.points[:, 1] = mesh.points[:, 1] - min_y
 
-        mesh.points[:, 0] = mesh.points[:, 0] - mesh.points[:, 0].mean()
-        mesh.points[:, 2] = mesh.points[:, 2] - mesh.points[:, 2].mean()
+            mesh.points[:, 0] = mesh.points[:, 0] - mesh.points[:, 0].mean()
+            mesh.points[:, 2] = mesh.points[:, 2] - mesh.points[:, 2].mean()
 
-        print(f"Fixed bounds: {mesh.bounds}")
-        return mesh
+            print(f"Fixed bounds: {mesh.bounds}")
+            log.info(f"Fixed bounds: {mesh.bounds}")
+            return mesh
+        except Exception as e:
+            log.error(f"Failed to fix orientation: {e}")
+            show_error(None, "ERROR", str(e))
+            raise e
 
     def _generate_single_mesh(self, mask, sigma_value, smooth_iterations, center_model):
         """Вспомогательный метод для создания меша из маски."""
@@ -153,6 +189,8 @@ class MeshConverter:
 
         except Exception as e:
             print(f"Error generating mesh: {e}")
+            log.error(f"Failed to generate mesh: {e}")
+            show_error(None, "ERROR", str(e))
             return None
 
     def build_single_model(self, model_type, roi_pos, roi_size, threshold_value, min_island_size, keep_largest, sigma_value, smooth_iterations, center_model):
@@ -160,6 +198,7 @@ class MeshConverter:
         Строит ОДНУ модель указанного типа из выделенной ROI.
         Использует ТОЛЬКО порог пользователя.
         """
+        log.info(f"Building model: {model_type}")
         if self.full_volume is None:
             raise ValueError("No volume data loaded")
 
@@ -171,13 +210,18 @@ class MeshConverter:
         y0, y1 = max(0, y0), min(self.full_volume.shape[1], y1)
 
         if x0 >= x1 or y0 >= y1:
+            log.info(f"Roi position out of bounds: {x0}, {x1}, {y0}, {y1}")
             raise ValueError("Invalid ROI selection")
+            log.info(f"Roi position: {x0}, {x1}, {y0}, {y1}")
 
         vol = self.full_volume[:, y0:y1, x0:x1]
 
         print(f"\nBuilding model: {model_type}")
+        log.info(f"Building model: {model_type}")
         print(f"Volume shape: {vol.shape}, Threshold: {threshold_value}")
+        log.info(f"Volume shape: {vol.shape}, Threshold: {threshold_value}")
         print(f"Volume min: {vol.min()}, max: {vol.max()}, mean: {vol.mean():.2f}")
+        log.info(f"Building model: {model_type}")
 
         # СОЗДАЁМ МАСКУ ТОЛЬКО ПО ПОРОГУ ПОЛЬЗОВАТЕЛЯ
         # Пользователь сам выбирает что выделять через ROI и порог
@@ -196,9 +240,11 @@ class MeshConverter:
             mask = vol > threshold_value
 
         print(f"Mask voxels before cleanup: {np.sum(mask)}")
+        log.info(f"Mask voxels before cleanup: {np.sum(mask)}")
 
         if not np.any(mask):
             print(f"No voxels found for {model_type} with threshold {threshold_value}")
+            log.info(f"No voxels found for {model_type} with threshold {threshold_value}")
             return None
 
         # Удаление мусора
@@ -213,16 +259,18 @@ class MeshConverter:
             mask = morphology.remove_small_objects(mask, min_size=min_island_size)
 
         print(f"Mask voxels after cleanup: {np.sum(mask)}")
+        log.info(f"Mask voxels after cleanup: {np.sum(mask)}")
 
         if not np.any(mask):
             print(f"No objects remain after cleanup for {model_type}")
+            log.info(f"No objects remain after cleanup for {model_type}")
             return None
 
         # Генерируем меш
         mesh = self._generate_single_mesh(mask, sigma_value, smooth_iterations, center_model)
 
         if mesh is not None:
-            print(f"✓ {model_type} mesh generated: {mesh.n_points} vertices")
+            print(f"{model_type} mesh generated: {mesh.n_points} vertices")
             # Обновляем метаданные
             center = mesh.center
             # Преобразуем tuple в список, если нужно
@@ -241,8 +289,10 @@ class MeshConverter:
                 },
                 'position': center_list
             }
+            log.info(self.model_metadata[model_type])
         else:
-            print(f"✗ {model_type} mesh generation failed")
+            print(f" {model_type} mesh generation failed")
+            log.error(f"Failed to generate mesh: {model_type}")
             self.model_metadata[model_type] = {'status': 'failed'}
 
         return mesh
@@ -256,6 +306,7 @@ class MeshConverter:
         print(f"\n{'=' * 60}")
         print(f"Building selected models: {selected_types}")
         print(f"{'=' * 60}")
+        log.info(f"Building selected models: {selected_types}")
 
         for model_type in selected_types:
             mesh = self.build_single_model(
@@ -277,27 +328,35 @@ class MeshConverter:
         if self.models.get('brain') is not None and self.models.get('tumor') is not None:
             # Получаем центры и преобразуем в numpy массивы
             brain_center = np.array(self.models['brain'].center)
+            log.info(f"Brain center: {brain_center}")
             tumor_center = np.array(self.models['tumor'].center)
+            log.info(f"Tumor center: {tumor_center}")
 
             # Вычитаем массивы
             relative_position = tumor_center - brain_center
+            log.info(f"Relative position: {relative_position}")
 
             # Расстояние
             distance = np.linalg.norm(relative_position)
+            log.info(f"Distance: {distance}")
 
             brain_bounds = self.models['brain'].bounds
+            log.info(f"Brain bounds: {brain_bounds}")
             brain_size = {
                 'x': brain_bounds[1] - brain_bounds[0],
                 'y': brain_bounds[3] - brain_bounds[2],
                 'z': brain_bounds[5] - brain_bounds[4]
             }
+            log.info(f"Brain size: {brain_size}")
 
             tumor_bounds = self.models['tumor'].bounds
+            log.info(f"Tumor bounds: {tumor_bounds}")
             tumor_size = {
                 'x': tumor_bounds[1] - tumor_bounds[0],
                 'y': tumor_bounds[3] - tumor_bounds[2],
                 'z': tumor_bounds[5] - tumor_bounds[4]
             }
+            log.info(f"Tumor size: {tumor_size}")
 
             # Обновляем метаданные
             if 'tumor' in self.model_metadata:
